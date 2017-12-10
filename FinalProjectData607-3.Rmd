@@ -1,0 +1,174 @@
+---
+title: "Final Project"
+author: "Lidiia Tronina"
+date: "12/9/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ROAuth)
+library(plyr)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(devtools)
+install_github("twitteR", username="lidiia25")
+library(twitteR)
+```
+
+
+```{r key, include=FALSE}
+api_key <- "IcJAjWdoLGRl8aJWE74l8pJKu"
+ 
+api_secret <- "vBD9OqwdpFQLKtdbkTB4Am2KWatPq7HqXBsZ7FNRsDXe0Yzyyb"
+ 
+access_token <- "	2994266158-4k1gErETX1ZOY01vn3e8qXg9rYAR1NqPi4eshNW"
+ 
+access_token_secret <- "JSxp8DslUSs5C9Evpr5hKEUa7onFPBdfmwx17edz4vEpz"
+
+setup_twitter_oauth(api_key,api_secret)
+```
+
+
+
+
+```{r}
+dec9<- searchTwitter("#newyork -filter:retweets",n=3000, lang = "en", since = "2017-12-09", until = "2017-12-10", geocode = "40.7128,-74.0060, 50mi")
+
+```
+
+```{r}
+
+dec8<- searchTwitter("#newyork -filter:retweets",n=3000, since = "2017-12-08", until = "2017-12-09", geocode = "40.7128,-74.0060, 50mi")
+```
+
+```{r}
+dec3<- searchTwitter("#newyork -filter:retweets",n=3000, since = "2017-12-03", until = "2017-12-04", geocode = "40.7128,-74.0060, 50mi")
+```
+
+
+```{r}
+dec7<- searchTwitter("#newyork -filter:retweets",n=3000, since = "2017-12-07", until = "2017-12-08", geocode = "40.7128,-74.0060, 50mi")
+```
+
+```{r}
+dec4<- searchTwitter("#newyork -filter:retweets",n=3000, since = "2017-12-04", until = "2017-12-05", geocode = "40.7128,-74.0060, 50mi")
+```
+
+```{r}
+dec6<- searchTwitter("#newyork -filter:retweets",n=3000, since = "2017-12-06", until = "2017-12-07", geocode = "40.7128,-74.0060, 50mi")
+```
+
+
+```{r}
+dec5<- searchTwitter("#newyork -filter:retweets",n=3000, since = "2017-12-05", until = "2017-12-06", geocode = "40.7128,-74.0060, 50mi")
+```
+
+```{r}
+df_dec3 <- twListToDF(dec3)
+df_dec4 <- twListToDF(dec4)
+df_dec5 <- twListToDF(dec5)
+df_dec6 <- twListToDF(dec6)
+df_dec7 <- twListToDF(dec7)
+df_dec8 <- twListToDF(dec8)
+df_dec9 <- twListToDF(dec9)
+```
+
+```{r}
+december <- rbind(df_dec3,df_dec4,df_dec5,df_dec6,df_dec7,df_dec8,df_dec9)
+december$created <- strftime(december$created, '%Y-%m-%d')
+
+```
+
+```{r}
+pos.words <- scan('https://raw.githubusercontent.com/Lidiia25/DATA607_final_project/master/positive-words.txt', what='character', comment.char=';') 
+ neg.words <-  scan('https://raw.githubusercontent.com/Lidiia25/DATA607_final_project/master/negative-words.txt', what='character', comment.char=';') 
+```
+
+
+
+```{r}
+ score.sentiment <- function(sentences, pos.words, neg.words, .progress='none')
+ {
+ require(plyr)
+ require(stringr)
+ scores <- laply(sentences, function(sentence, pos.words, neg.words){
+ sentence <- gsub('[[:punct:]]', "", sentence)
+ sentence <- gsub('[[:cntrl:]]', "", sentence)
+ sentence <- gsub('\\d+', "", sentence)
+ sentence <- tolower(sentence)
+ word.list <- str_split(sentence, '\\s+')
+ words <- unlist(word.list)
+ pos.matches <- match(words, pos.words)
+ neg.matches <- match(words, neg.words)
+ pos.matches <- !is.na(pos.matches)
+ neg.matches <- !is.na(neg.matches)
+ score <- sum(pos.matches) - sum(neg.matches)
+ return(score)
+ }, pos.words, neg.words, .progress=.progress)
+ scores.df <- data.frame(score=scores, text=sentences)
+ return(scores.df)
+ }
+```
+
+
+
+
+
+
+
+```{r}
+december$text <- as.factor(december$text)
+december$text <- sapply(december$text,function(row) iconv(row, "latin1", "ASCII", sub=""))
+december_sentiment <- score.sentiment(december$text, pos.words, neg.words, .progress='text')
+
+```
+
+
+```{r}
+december2 <- december_sentiment
+december2$created <- december$created
+december2$created <- as.Date(december2$created)
+```
+
+
+```{r}
+december3 <- mutate(december2, tweet=ifelse(december2$score > 0, 'positive', ifelse(december2$score < 0, 'negative', 'neutral')))
+ december4 <- group_by(december3, tweet, created)
+december4 <- summarise(december4, number=n())
+dec_final <- subset(december4, tweet != "neutral")
+
+```
+
+
+
+
+
+```{r}
+ggplot(dec_final, aes(created, number)) + geom_line(aes(group=tweet, color=tweet), size=2) +
+ geom_point(aes(group=tweet, color=tweet), size=3) +
+ theme(text = element_text(size=10), axis.text.x = element_text(angle=45, vjust=1)) + ggtitle(dec_final) + scale_x_date(name = 'date', date_breaks = '1 day', date_labels = '%D') +
+ annotate("text", x = as.Date("2017-12-09"), y = 700 , label = "Snow") +
+ annotate("text", x = as.Date("2017-12-03"), y = 700 , label = "Cloudy") +
+ annotate("text", x = as.Date("2017-12-05"), y = 700 , label = "Rain") +
+ annotate("text", x = as.Date("2017-12-09"), y = 600 , label = "33°F") +
+ annotate("text", x = as.Date("2017-12-03"), y = 600 , label = "45°F") +
+ annotate("text", x = as.Date("2017-12-05"), y = 600 , label = "56°F") +
+ annotate("text", x = as.Date("2017-12-04"), y = 600 , label = "46°F") +
+ annotate("text", x = as.Date("2017-12-06"), y = 600 , label = "50°F") +
+ annotate("text", x = as.Date("2017-12-07"), y = 600 , label = "41°F") +
+ annotate("text", x = as.Date("2017-12-08"), y = 600 , label = "37°F") + ylim(150, 1200)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
